@@ -20,8 +20,8 @@ jobs:
             PRIORITY=$(echo $i | jq -r .labels[].name)
             
             NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            HIGH_SLA="86400"  # 24 hours in seconds
-            MEDIUM_SLA="172800" # 48 hours in seconds
+            HIGH_SLA="300"  # 24 hours in seconds
+            MEDIUM_SLA="500" # 48 hours in seconds
             LOW_SLA="259200" # 72 hours in seconds
 
             SLA_TIME=$LOW_SLA
