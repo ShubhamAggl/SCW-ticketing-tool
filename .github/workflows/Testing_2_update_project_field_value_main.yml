@@ -95,7 +95,7 @@ jobs:
         run: |
           PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
           FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"
-          FIELD_VALUE="\"10\""
+          FIELD_VALUE=10  # ✅ Fix: Pass a number, NOT a string
 
           if [ -z "$PROJECT_ITEM_ID" ]; then
             echo "❌ ERROR: No ProjectV2Item ID found. Cannot update the field."
@@ -105,13 +105,13 @@ jobs:
           echo "Updating project field for ProjectV2Item ID: $PROJECT_ITEM_ID..."
 
           gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='
-          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
             updateProjectV2ItemFieldValue(
               input: {
                 projectId: $projectId
                 itemId: $itemId
                 fieldId: $fieldId
-                value: { text: $value }
+                value: { number: $value }
               }
             ) {
               projectV2Item {
