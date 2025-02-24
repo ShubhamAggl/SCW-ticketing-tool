@@ -1,0 +1,45 @@
+name: Update GitHub Project Field
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update-project-field:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Update Project Field
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Updated Project ID
+          FIELD_ID="171193780"  # ✅ Updated Field ID
+          ISSUE_NUMBER=${{ github.event.issue.node_id }}  # ✅ Use node_id instead of number
+          FIELD_VALUE="\"Automated Update\""  # ✅ Replace with desired field value
+
+          echo "Updating Project Field for Issue ID: $ISSUE_NUMBER..."
+
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='
+          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(
+              input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { text: $value }
+              }
+            ) {
+              projectV2Item {
+                id
+              }
+            }
+          }' -F projectId=$PROJECT_ID -F itemId=$ISSUE_NUMBER -F fieldId=$FIELD_ID -F value=$FIELD_VALUE
+
+          echo "✅ Project field updated successfully!"
