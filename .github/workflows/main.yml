@@ -1,0 +1,11 @@
+curl -X POST -H "Authorization: Bearer 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" \
+-H "Content-Type: application/json" \
+-d '{
+  "query": "{
+    user(login: \"ShubhamAggl\") {
+      projectsV2(first: 10) {
+        nodes { id title }
+      }
+    }
+  }"
+}' https://api.github.com/graphql
