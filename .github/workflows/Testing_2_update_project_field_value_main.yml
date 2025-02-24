@@ -6,7 +6,7 @@ on:
 
 permissions:
   contents: write
-  issues: write  # GitHub Projects V2 relies on issue permissions
+  issues: write
 
 jobs:
   update-project-field:
@@ -34,15 +34,75 @@ jobs:
           echo "Issue ID: $ISSUE_ID"
           echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
 
+      - name: Check if Issue Exists in Project
+        id: check_project_item
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          
+          echo "Checking if the issue is already in the project..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='
+          {
+            node(id: "'$PROJECT_ID'") {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content {
+                      ... on Issue {
+                        id
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
+
+          if [ -z "$PROJECT_ITEM_ID" ]; then
+            echo "Issue not found in project."
+            echo "PROJECT_ITEM_ID=" >> "$GITHUB_ENV"
+          else
+            echo "Issue is already in the project. ProjectV2Item ID: $PROJECT_ITEM_ID"
+            echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+          fi
+
+      - name: Add Issue to Project (if not added)
+        if: env.PROJECT_ITEM_ID == ''
+        id: add_to_project
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+
+          echo "Adding issue to project..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='
+          mutation {
+            addProjectV2ItemById(input: {projectId: "'$PROJECT_ID'", contentId: "'$ISSUE_ID'"}) {
+              item {
+                id
+              }
+            }
+          }' --jq '.data.addProjectV2ItemById.item.id')
+
+          echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
+          echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+
       - name: Update Project Field
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Correct Project ID
-          FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"  # ✅ Correct Field ID
-          FIELD_VALUE="\"10\""  # ✅ Value to set
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"
+          FIELD_VALUE="\"10\""
 
-          echo "Updating project field for Issue ID: $ISSUE_ID..."
+          if [ -z "$PROJECT_ITEM_ID" ]; then
+            echo "❌ ERROR: No ProjectV2Item ID found. Cannot update the field."
+            exit 1
+          fi
+
+          echo "Updating project field for ProjectV2Item ID: $PROJECT_ITEM_ID..."
 
           gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='
           mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
@@ -58,6 +118,6 @@ jobs:
                 id
               }
             }
-          }' -F projectId="$PROJECT_ID" -F itemId="$ISSUE_ID" -F fieldId="$FIELD_ID" -F value="$FIELD_VALUE"
+          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$FIELD_ID" -F value="$FIELD_VALUE"
 
           echo "✅ Project field updated successfully!"
