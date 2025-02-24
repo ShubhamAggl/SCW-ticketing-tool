@@ -2,28 +2,27 @@ name: Update GitHub Project Field
 
 on:
   issues:
-    types: [labeled, opened]  # Adjust triggers as needed
+    types: [opened, edited, labeled]
 
 permissions:
+  contents: write
   issues: write
-  contents: read
-  projects: write
+  projects: write  # Ensure project update permission
 
 jobs:
-  update_project_variable:
+  update-project-field:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Authenticate GitHub CLI
-        env:
-          GH_TOKEN: ${{ secrets.gh_token }}
-        run: gh auth status  # Verify authentication
+      - name: Checkout code
+        uses: actions/checkout@v3
 
       - name: Get Issue ID
         id: get_issue_id
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
+          echo "Fetching Issue ID for issue #${{ github.event.issue.number }}..."
+          
           ISSUE_ID=$(gh api graphql -f query='
           {
             repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
@@ -38,23 +37,28 @@ jobs:
 
       - name: Update Project Field
         env:
-          GH_TOKEN: ${{ secrets.gh_token }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          gh api graphql -f query='
-          mutation($projectId: ID!, $fieldId: ID!, $issueId: ID!, $value: ID!) {
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Correct Project ID
+          FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"  # ✅ Correct Field ID
+          FIELD_VALUE="\"10\""  # ✅ Value to set
+
+          echo "Updating project field for Issue ID: $ISSUE_ID..."
+
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='
+          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
             updateProjectV2ItemFieldValue(
               input: {
-                projectId: $projectId,
-                fieldId: $fieldId,
-                itemId: $issueId,
-                value: { text: 10 }
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { text: $value }
               }
             ) {
               projectV2Item {
                 id
               }
             }
-          }' -f projectId="PVT_kwHOBffn_c4Ay8TW" \
-             -f fieldId="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ" \
-             -f issueId="${{ env.ISSUE_ID }}" \
-             -f value="Updated Value"
+          }' -F projectId="$PROJECT_ID" -F itemId="$ISSUE_ID" -F fieldId="$FIELD_ID" -F value="$FIELD_VALUE"
+
+          echo "✅ Project field updated successfully!"
