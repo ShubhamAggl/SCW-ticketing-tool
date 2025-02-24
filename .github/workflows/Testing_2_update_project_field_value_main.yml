@@ -1,0 +1,50 @@
+name: Update GitHub Project Field
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  update_project_field:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Get Issue ID
+        id: get_issue_id
+        run: |
+          ISSUE_ID=$(gh api graphql -f query='
+            query {
+              repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+                issue(number: ${{ github.event.issue.number }}) {
+                  id
+                }
+              }
+            }
+          ' --jq '.data.repository.issue.id')
+          echo "ISSUE_ID=$ISSUE_ID" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+
+      - name: Update Project Field
+        run: |
+          gh api graphql -f query='
+            mutation {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: "PVT_kwHOBffn_c4Ay8TW",
+                  itemId: "${{ env.ISSUE_ID }}",
+                  fieldId: "PVTF_lAHOBffn_c4Ay8TWzgo0NbQ",
+                  value: { text: "New Value" }
+                }
+              ) {
+                projectV2Item {
+                  id
+                }
+              }
+            }
+          '
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
