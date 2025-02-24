@@ -1,0 +1,39 @@
+name: Get GitHub Project Field Value
+
+on:
+  workflow_dispatch:  # ✅ Allows manual trigger of the workflow
+
+jobs:
+  get-project-field-value:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch GitHub Project Field Value
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Uses Secret Instead of Hardcoding
+        run: |
+          curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data-raw '{
+            "query": "query { 
+              node(id: \"PVT_kwHOBffn_c4Ay8TW\") { 
+                ... on ProjectV2 {
+                  items(first: 10) {
+                    nodes {
+                      id
+                      fieldValues(first: 10) {
+                        nodes {
+                          field {
+                            id
+                            name
+                          }
+                          ... on ProjectV2ItemFieldTextValue {
+                            text
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }"
+          }' https://api.github.com/graphql
