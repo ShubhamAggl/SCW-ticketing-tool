@@ -9,16 +9,16 @@ jobs:
     steps:
       - name: Fetch GitHub Project ID
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Secure token usage
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Uses Secret Instead of Hardcoding
         run: |
           curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
           -H "Content-Type: application/json" \
           -d '{
-            "query": "{
-              user(login: \"ShubhamAggl\") {
-                projectsV2(first: 10) {
-                  nodes { id title }
-                }
-              }
+            "query": "query { 
+              user(login: \"ShubhamAggl\") { 
+                projectsV2(first: 10) { 
+                  nodes { id title } 
+                } 
+              } 
             }"
           }' https://api.github.com/graphql
