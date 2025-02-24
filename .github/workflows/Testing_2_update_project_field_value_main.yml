@@ -2,49 +2,59 @@ name: Update GitHub Project Field
 
 on:
   issues:
-    types: [labeled]
+    types: [labeled, opened]  # Adjust triggers as needed
+
+permissions:
+  issues: write
+  contents: read
+  projects: write
 
 jobs:
-  update_project_field:
+  update_project_variable:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Authenticate GitHub CLI
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
+        run: gh auth status  # Verify authentication
 
       - name: Get Issue ID
         id: get_issue_id
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
         run: |
           ISSUE_ID=$(gh api graphql -f query='
-            query {
-              repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
-                issue(number: ${{ github.event.issue.number }}) {
-                  id
-                }
+          {
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              issue(number: ${{ github.event.issue.number }}) {
+                id
               }
             }
-          ' --jq '.data.repository.issue.id')
-          echo "ISSUE_ID=$ISSUE_ID" >> $GITHUB_ENV
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          }' --jq '.data.repository.issue.id')
+
+          echo "Issue ID: $ISSUE_ID"
+          echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
 
       - name: Update Project Field
+        env:
+          GH_TOKEN: ${{ secrets.gh_token }}
         run: |
           gh api graphql -f query='
-            mutation {
-              updateProjectV2ItemFieldValue(
-                input: {
-                  projectId: "PVT_kwHOBffn_c4Ay8TW",
-                  itemId: "${{ env.ISSUE_ID }}",
-                  fieldId: "PVTF_lAHOBffn_c4Ay8TWzgo0NbQ",
-                  value: { text: "New Value" }
-                }
-              ) {
-                projectV2Item {
-                  id
-                }
+          mutation($projectId: ID!, $fieldId: ID!, $issueId: ID!, $value: ID!) {
+            updateProjectV2ItemFieldValue(
+              input: {
+                projectId: $projectId,
+                fieldId: $fieldId,
+                itemId: $issueId,
+                value: { text: 10 }
+              }
+            ) {
+              projectV2Item {
+                id
               }
             }
-          '
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          }' -f projectId="PVT_kwHOBffn_c4Ay8TW" \
+             -f fieldId="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ" \
+             -f issueId="${{ env.ISSUE_ID }}" \
+             -f value="Updated Value"
