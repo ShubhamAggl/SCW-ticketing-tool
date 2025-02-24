@@ -22,7 +22,7 @@ jobs:
           PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Updated Project ID
           FIELD_ID="171193780"  # ✅ Updated Field ID
           ISSUE_NUMBER=${{ github.event.issue.node_id }}  # ✅ Use node_id instead of number
-          FIELD_VALUE="\"Automated Update\""  # ✅ Replace with desired field value
+          FIELD_VALUE="\"10\""  # ✅ Set the field value as "10"
 
           echo "Updating Project Field for Issue ID: $ISSUE_NUMBER..."
 
