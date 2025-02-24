@@ -24,8 +24,8 @@ jobs:
 
           curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
           -H "Content-Type: application/json" \
-          --data-raw '{
-            "query": "mutation UpdateField($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
+          --data-raw "$(jq -n --arg projectId "$PROJECT_ID" --arg itemId "$ITEM_ID" --arg fieldId "$FIELD_ID" --argjson value "$FIELD_VALUE" '{
+            query: "mutation UpdateField($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
               updateProjectV2ItemFieldValue(
                 input: {
                   projectId: $projectId,
@@ -39,12 +39,12 @@ jobs:
                 }
               }
             }",
-            "variables": {
-              "projectId": "'"$PROJECT_ID"'",
-              "itemId": "'"$ITEM_ID"'",
-              "fieldId": "'"$FIELD_ID"'",
-              "value": '$FIELD_VALUE'
+            variables: {
+              projectId: $projectId,
+              itemId: $itemId,
+              fieldId: $fieldId,
+              value: $value
             }
-          }' https://api.github.com/graphql
+          }')" https://api.github.com/graphql
 
           echo "✅ Project field updated successfully!"
