@@ -1,8 +1,7 @@
 name: Update GitHub Project Field
 
 on:
-  issues:
-    types: [opened, edited, labeled]
+  workflow_dispatch:  # ✅ Allows manual trigger in GitHub Actions
 
 permissions:
   contents: write
@@ -12,34 +11,40 @@ jobs:
   update-project-field:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
       - name: Update Project Field
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Uses Secret Instead of Hardcoding
         run: |
-          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Updated Project ID
-          FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"  # ✅ Updated Field ID
-          ISSUE_NUMBER=${{ github.event.issue.node_id }}  # ✅ Use node_id instead of number
-          FIELD_VALUE="\"10\""  # ✅ Set the field value as "10"
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Your GitHub Project ID
+          ITEM_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"  # ✅ Correct Project Item ID
+          FIELD_ID="171193780"  # ✅ Field ID for "testing"
+          FIELD_VALUE="10"  # ✅ Value to update the field with
 
-          echo "Updating Project Field for Issue ID: $ISSUE_NUMBER..."
+          echo "Updating Project Field for Item ID: $ITEM_ID..."
 
-          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='
-          mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
-            updateProjectV2ItemFieldValue(
-              input: {
-                projectId: $projectId
-                itemId: $itemId
-                fieldId: $fieldId
-                value: { text: $value }
+          curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Content-Type: application/json" \
+          --data-raw '{
+            "query": "mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+              updateProjectV2ItemFieldValue(
+                input: {
+                  projectId: $projectId,
+                  itemId: $itemId,
+                  fieldId: $fieldId,
+                  value: { text: $value }
+                }
+              ) {
+                projectV2Item {
+                  id
+                }
               }
-            ) {
-              projectV2Item {
-                id
-              }
+            }",
+            "variables": {
+              "projectId": "'"$PROJECT_ID"'",
+              "itemId": "'"$ITEM_ID"'",
+              "fieldId": "'"$FIELD_ID"'",
+              "value": "'"$FIELD_VALUE"'"
             }
-          }' -F projectId=$PROJECT_ID -F itemId=$ISSUE_NUMBER -F fieldId=$FIELD_ID -F value=$FIELD_VALUE
+          }' https://api.github.com/graphql
 
           echo "✅ Project field updated successfully!"
