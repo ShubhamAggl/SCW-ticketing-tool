@@ -6,8 +6,7 @@ on:
 
 permissions:
   contents: write
-  issues: write
-  projects: write  # Ensure project update permission
+  issues: write  # GitHub Projects V2 relies on issue permissions
 
 jobs:
   update-project-field:
