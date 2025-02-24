@@ -1,11 +1,24 @@
-curl -X POST -H "Authorization: Bearer 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" \
--H "Content-Type: application/json" \
--d '{
-  "query": "{
-    user(login: \"ShubhamAggl\") {
-      projectsV2(first: 10) {
-        nodes { id title }
-      }
-    }
-  }"
-}' https://api.github.com/graphql
+name: Get GitHub Project ID
+
+on:
+  workflow_dispatch:  # ✅ Allows manual trigger of the workflow
+
+jobs:
+  get-project-id:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch GitHub Project ID
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Secure token usage
+        run: |
+          curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "query": "{
+              user(login: \"ShubhamAggl\") {
+                projectsV2(first: 10) {
+                  nodes { id title }
+                }
+              }
+            }"
+          }' https://api.github.com/graphql
