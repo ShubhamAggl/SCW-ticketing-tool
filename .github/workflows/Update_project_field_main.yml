@@ -16,7 +16,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Uses Secret Instead of Hardcoding
         run: |
           PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"  # ✅ Your GitHub Project ID
-          ITEM_ID="I_kwDON9ItTs6rT7zy"  # ✅ Correct Project Item ID
+          ITEM_ID="2874129650"  # ✅ Correct Project Item ID
           FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo0NbQ"  # ✅ Field ID for "testing"
           FIELD_VALUE=10  # ✅ Ensures correct type (number)
 
