@@ -13,12 +13,6 @@ jobs:
         run: |
           curl -X POST -H "Authorization: Bearer $GH_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{
-            "query": "query { 
-              user(login: \"ShubhamAggl\") { 
-                projectsV2(first: 10) { 
-                  nodes { id title } 
-                } 
-              } 
-            }"
+          --data-raw '{
+            "query": "query { user(login: \"ShubhamAggl\") { projectsV2(first: 10) { nodes { id title } } } }"
           }' https://api.github.com/graphql
