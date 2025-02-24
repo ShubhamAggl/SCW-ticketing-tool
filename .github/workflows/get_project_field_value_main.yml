@@ -29,6 +29,12 @@ jobs:
                           ... on ProjectV2ItemFieldTextValue {
                             text
                           }
+                          ... on ProjectV2ItemFieldSingleSelectValue {
+                            name
+                          }
+                          ... on ProjectV2ItemFieldNumberValue {
+                            number
+                          }
                         }
                       }
                     }
