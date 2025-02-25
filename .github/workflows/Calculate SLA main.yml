@@ -1,0 +1,110 @@
+name: Calculate Business Hours & SLA Breach
+
+on:
+  issues:
+    types: [closed]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  calculate-business-hours:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Get Issue ID and Metadata
+        id: get_issue_details
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "Fetching Issue ID and details..."
+          
+          ISSUE_ID=$(gh api graphql -f query='{
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              issue(number: ${{ github.event.issue.number }}) {
+                id
+                createdAt
+                closedAt
+                labels(first: 10) {
+                  nodes {
+                    name
+                  }
+                }
+              }
+            }
+          }' --jq '.data.repository.issue')
+          
+          START_TIME=$(echo "$ISSUE_ID" | jq -r '.createdAt')
+          END_TIME=$(echo "$ISSUE_ID" | jq -r '.closedAt')
+          PRIORITY=$(echo "$ISSUE_ID" | jq -r '.labels.nodes[].name' | grep -E '^P[1-4]$' || echo "P4")
+          
+          echo "START_TIME=$START_TIME" >> "$GITHUB_ENV"
+          echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
+          echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
+
+      - name: Calculate Business Hours
+        id: calculate_hours
+        run: |
+          echo "Calculating business hours..."
+          python3 calculate_hours.py "$START_TIME" "$END_TIME" "$PRIORITY" > business_hours_output.txt
+          
+          TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours:' | cut -d ':' -f2 | tr -d ' ')
+          SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
+          
+          echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
+          echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
+
+      - name: Update Project Fields
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          TOTAL_HOURS_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RLc"
+          SLA_BREACHED_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RYQ"
+          
+          echo "Fetching Project Item ID..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='{
+            node(id: "'$PROJECT_ID'") {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content { ... on Issue { id } }
+                  }
+                }
+              }
+            }
+          }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
+          
+          if [ -z "$PROJECT_ITEM_ID" ]; then
+            echo "Issue not found in project. Exiting."
+            exit 1
+          fi
+          
+          echo "Updating project fields..."
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { number: $value }
+            }) {
+              projectV2Item { id }
+            }
+          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$TOTAL_HOURS_FIELD_ID" -F value="$TOTAL_HOURS"
+          
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { text: $value }
+            }) {
+              projectV2Item { id }
+            }
+          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$SLA_BREACHED_FIELD_ID" -F value="$SLA_BREACHED"
+
+          echo "✅ Project fields updated successfully!"
