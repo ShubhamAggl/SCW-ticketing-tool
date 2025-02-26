@@ -34,11 +34,7 @@ def calculate_business_hours(start_time, end_time):
             business_seconds += 1
         current_time += timedelta(seconds=1)
     
-    business_hours = business_seconds // 3600
-    business_minutes = (business_seconds % 3600) // 60
-    business_seconds = business_seconds % 60
-    
-    return f"{business_hours:02}:{business_minutes:02}:{business_seconds:02}"
+    return business_seconds
 
 def get_sla_threshold(priority):
     """Returns the SLA threshold in business hours based on priority label."""
@@ -55,11 +51,10 @@ if __name__ == "__main__":
     end_time = datetime.fromisoformat(sys.argv[2].replace('Z', '+00:00')).astimezone(pytz.utc)
     priority = sys.argv[3]
     
-    total_business_hours = calculate_business_hours(start_time, end_time)
+    total_business_seconds = calculate_business_hours(start_time, end_time)
     sla_threshold = get_sla_threshold(priority)
     
-    business_seconds = sum(int(x) * 60 ** i for i, x in enumerate(reversed(total_business_hours.split(':'))))
-    sla_breached = "Breached" if business_seconds > sla_threshold else "Within SLA"
+    sla_breached = "Breached" if total_business_seconds > sla_threshold else "Within SLA"
     
-    print(f"Total Hours: {total_business_hours}")
+    print(f"Total Hours: {total_business_seconds}")  # Store total business hours in seconds
     print(f"SLA Breached: {sla_breached}")
