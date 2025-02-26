@@ -26,25 +26,29 @@ def calculate_business_hours(start_time, end_time):
     start_time = adjust_to_business_hours(start_time)
     end_time = adjust_to_business_hours(end_time)
     
-    business_hours = 0
+    business_seconds = 0
     current_time = start_time
     
     while current_time < end_time:
         if current_time.weekday() < 5 and 10 <= current_time.hour < 18:
-            business_hours += 1
-        current_time += timedelta(hours=1)
+            business_seconds += 1
+        current_time += timedelta(seconds=1)
     
-    return business_hours
+    business_hours = business_seconds // 3600
+    business_minutes = (business_seconds % 3600) // 60
+    business_seconds = business_seconds % 60
+    
+    return f"{business_hours:02}:{business_minutes:02}:{business_seconds:02}"
 
 def get_sla_threshold(priority):
     """Returns the SLA threshold in business hours based on priority label."""
     sla_mapping = {
-        "P1": 16,  # 2 days * 8 business hours
-        "P2": 24,  # 3 days * 8 business hours
-        "P3": 32,  # 4 days * 8 business hours
-        "P4": 40,  # 5 days * 8 business hours
+        "P1": 16 * 3600,  # 2 days * 8 business hours in seconds
+        "P2": 24 * 3600,  # 3 days * 8 business hours in seconds
+        "P3": 32 * 3600,  # 4 days * 8 business hours in seconds
+        "P4": 40 * 3600,  # 5 days * 8 business hours in seconds
     }
-    return sla_mapping.get(priority, 40)
+    return sla_mapping.get(priority, 40 * 3600)
 
 if __name__ == "__main__":
     start_time = datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00')).astimezone(pytz.utc)
@@ -53,7 +57,9 @@ if __name__ == "__main__":
     
     total_business_hours = calculate_business_hours(start_time, end_time)
     sla_threshold = get_sla_threshold(priority)
-    sla_breached = "Breached" if total_business_hours > sla_threshold else "Within SLA"
+    
+    business_seconds = sum(int(x) * 60 ** i for i, x in enumerate(reversed(total_business_hours.split(':'))))
+    sla_breached = "Breached" if business_seconds > sla_threshold else "Within SLA"
     
     print(f"Total Hours: {total_business_hours}")
     print(f"SLA Breached: {sla_breached}")
