@@ -50,11 +50,19 @@ if __name__ == "__main__":
     start_time = datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00')).astimezone(pytz.utc)
     end_time = datetime.fromisoformat(sys.argv[2].replace('Z', '+00:00')).astimezone(pytz.utc)
     priority = sys.argv[3]
-    
+
     total_business_seconds = calculate_business_hours(start_time, end_time)
     sla_threshold = get_sla_threshold(priority)
-    
-    sla_breached = "Breached" if total_business_seconds > sla_threshold else "Within SLA"
-    
+
+    # Debugging Output
+    print(f"Total Business Seconds: {total_business_seconds}")
+    print(f"SLA Threshold (Seconds): {sla_threshold}")
+
+    # Fix: Ensure we're comparing in seconds
+    if total_business_seconds > sla_threshold:
+        sla_breached = "Breached"
+    else:
+        sla_breached = "Within SLA"
+
     print(f"Total Hours: {total_business_seconds}")  # Store total business hours in seconds
     print(f"SLA Breached: {sla_breached}")
