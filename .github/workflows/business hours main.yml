@@ -22,7 +22,7 @@ jobs:
         run: |
           echo "Fetching Issue ID and details..."
           
-          ISSUE_ID=$(gh api graphql -f query='{
+          ISSUE_DATA=$(gh api graphql -f query='{
             repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
               issue(number: ${{ github.event.issue.number }}) {
                 id
@@ -35,15 +35,26 @@ jobs:
                 }
               }
             }
-          }' --jq '.data.repository.issue')
-          
-          START_TIME=$(echo "$ISSUE_ID" | jq -r '.createdAt')
-          END_TIME=$(echo "$ISSUE_ID" | jq -r '.closedAt')
-          PRIORITY=$(echo "$ISSUE_ID" | jq -r '.labels.nodes[].name' | grep -E '^P[1-4]$' || echo "P4")
-          
+          }')
+
+          echo "Raw Issue Data: $ISSUE_DATA"
+
+          ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
+
+          if [ -z "$ISSUE_ID" ]; then
+            echo "❌ ERROR: ISSUE_ID is empty! Exiting."
+            exit 1
+          fi
+
+          START_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.createdAt')
+          END_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.closedAt')
+          PRIORITY=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.labels.nodes[].name' | grep -E '^P[1-4]$' || echo "P4")
+
+          echo "Extracted Issue ID: $ISSUE_ID"
           echo "START_TIME=$START_TIME" >> "$GITHUB_ENV"
           echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
           echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
+          echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
 
       - name: Add Issue to Project (if not added)
         id: add_to_project
