@@ -45,6 +45,26 @@ jobs:
           echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
           echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
 
+      - name: Add Issue to Project (if not added)
+        id: add_to_project
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          
+          echo "Adding issue to project..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='
+          mutation {
+            addProjectV2ItemById(input: {projectId: "'$PROJECT_ID'", contentId: "'$ISSUE_ID'"}) {
+              item {
+                id
+              }
+            }
+          }' --jq '.data.addProjectV2ItemById.item.id')
+
+          echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
+          echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+
       - name: Calculate Business Hours
         id: calculate_hours
         run: |
