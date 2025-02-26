@@ -39,7 +39,7 @@ def calculate_business_hours(start_time, end_time):
 def get_sla_threshold(priority):
     """Returns the SLA threshold in business hours based on priority label."""
     sla_mapping = {
-        "P1": 16 * 3600,  # 2 days * 8 business hours in seconds
+        "P1": 30,  # 2 days * 8 business hours in seconds
         "P2": 24 * 3600,  # 3 days * 8 business hours in seconds
         "P3": 32 * 3600,  # 4 days * 8 business hours in seconds
         "P4": 40 * 3600,  # 5 days * 8 business hours in seconds
