@@ -43,35 +43,25 @@ def calculate_sla_time(issue_events):
     ist = pytz.timezone('Asia/Kolkata')
     total_seconds = 0
     active_start = None
-
-    print("🔍 Debug: Tracking SLA Status Changes")
     
     for event in issue_events:
         if event.get("event") == "project_column" and "column_name" in event:
             status = event["column_name"]
             timestamp = datetime.fromisoformat(event["created_at"].replace('Z', '+00:00')).astimezone(ist)
             
-            print(f"🕒 Status Change: {status} at {timestamp}")
-
             if status in sla_statuses:
                 if active_start is None:
                     active_start = adjust_to_business_hours(timestamp)
-                    print(f"✅ SLA Started at {active_start}")
             elif status in paused_statuses and active_start:
                 total_seconds += (timestamp - active_start).total_seconds()
-                print(f"⏸️ SLA Paused, Time Counted: {total_seconds} seconds")
                 active_start = None
             elif status in ignored_statuses:
-                print("❌ Ignored Status - Stopping SLA Calculation")
-                active_start = None
-
+                active_start = None  # Ignore all time spent after moving to these statuses
+    
     if active_start:
         total_seconds += (datetime.now(ist) - active_start).total_seconds()
     
-    print(f"⏳ Total SLA Business Seconds: {total_seconds}")
-    
     return int(total_seconds)
-
 
 def get_sla_threshold(priority):
     """Returns the SLA threshold in business hours based on priority label."""
@@ -94,20 +84,7 @@ if __name__ == "__main__":
     total_business_seconds = calculate_sla_time(issue_events)
     sla_threshold = get_sla_threshold(priority)
     
-    sla_breached = "Breached" if total_business_seconds > sla_threshold else "Within SLA"
+    sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
     
-    print(f"Total Hours (Seconds): {total_business_seconds}")  # Ensure correct formatting
-    print(f"SLA Breached: {sla_breached}")  # Ensure there is a space between "SLA" and value
-    print("🔍 Debug: SLA calculation started...")
-    print(f"Priority Received: {priority}")
-    print(f"Total Business Seconds: {total_business_seconds}")
-    print(f"SLA Threshold: {sla_threshold}")
+    print(f"Total Hours (Seconds): {total_business_seconds}")  # Store total business hours in seconds
     print(f"SLA Breached: {sla_breached}")
-
-# Ensure the output is captured
-with open("business_hours_output.txt", "w") as output_file:
-    output_file.write(f"Total Hours (Seconds): {total_business_seconds}\n")
-    output_file.write(f"SLA Breached: {sla_breached}\n")
-
-print("✅ Successfully wrote SLA results to business_hours_output.txt")
-
