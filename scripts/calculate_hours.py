@@ -88,3 +88,16 @@ if __name__ == "__main__":
     
     print(f"Total Hours (Seconds): {total_business_seconds}")  # Store total business hours in seconds
     print(f"SLA Breached: {sla_breached}")
+    print("🔍 Debug: SLA calculation started...")
+    print(f"Priority Received: {priority}")
+    print(f"Total Business Seconds: {total_business_seconds}")
+    print(f"SLA Threshold: {sla_threshold}")
+    print(f"SLA Breached: {sla_breached}")
+
+# Ensure the output is captured
+with open("business_hours_output.txt", "w") as output_file:
+    output_file.write(f"Total Hours (Seconds): {total_business_seconds}\n")
+    output_file.write(f"SLA Breached: {sla_breached}\n")
+
+print("✅ Successfully wrote SLA results to business_hours_output.txt")
+
