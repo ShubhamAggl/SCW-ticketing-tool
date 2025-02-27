@@ -40,9 +40,9 @@ def get_sla_threshold(priority):
     """Returns the SLA threshold in business hours based on priority label."""
     sla_mapping = {
         "P1": 30,  # ⚡ Testing: 30 seconds instead of 16 hours
-        "P2": 24 * 3600,  # 3 days * 8 business hours in seconds
-        "P3": 32 * 3600,  # 4 days * 8 business hours in seconds
-        "P4": 40 * 3600,  # 5 days * 8 business hours in seconds
+        "P2": 60,  # 3 days * 8 business hours in seconds
+        "P3": 120,  # 4 days * 8 business hours in seconds
+        "P4": 200,  # 5 days * 8 business hours in seconds
     }
     return sla_mapping.get(priority, 40 * 3600)
 
