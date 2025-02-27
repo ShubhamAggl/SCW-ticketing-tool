@@ -77,12 +77,12 @@ jobs:
           echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
 
       - name: Calculate Business Hours
-        id: calculate_hours
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          PROJECT_ID: "PVT_kwHOBffn_c4Ay8TW"  # Replace with your actual project ID
         run: |
           echo "Calculating business hours based on issue status changes..."
-          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PRIORITY" "$GH_TOKEN" > business_hours_output.txt
+          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PROJECT_ID" "$PRIORITY" "$GH_TOKEN"
 
       - name: Debug Business Hours Output  # 🔍 Add this step immediately after calculation
         run: |
