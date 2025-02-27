@@ -92,7 +92,7 @@ jobs:
       - name: Extract Business Hours Values
         run: |
           TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours (Seconds):' | cut -d ':' -f2 | tr -d ' ')
-          SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
+          SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2- | sed 's/^ //')
 
           echo "Extracted TOTAL_HOURS: $TOTAL_HOURS"
           echo "Extracted SLA_BREACHED: $SLA_BREACHED"
