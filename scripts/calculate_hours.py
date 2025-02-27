@@ -131,10 +131,12 @@ if __name__ == "__main__":
     issue_number = sys.argv[1]
     repo_owner = sys.argv[2]
     repo_name = sys.argv[3]
-    priority = sys.argv[4]
-    github_token = sys.argv[5]
-    
-issue_events = get_issue_status_changes(issue_number, repo_owner, repo_name, project_id, github_token)
+    project_id = sys.argv[4]  # Missing project_id added
+    priority = sys.argv[5]
+    github_token = sys.argv[6]  # Ensure we pass the GitHub token correctly
+
+    # ✅ Correctly indented lines
+    issue_events = get_issue_status_changes(issue_number, repo_owner, repo_name, project_id, github_token)
     total_business_seconds = calculate_sla_time(issue_events)
     sla_threshold = get_sla_threshold(priority)
     
