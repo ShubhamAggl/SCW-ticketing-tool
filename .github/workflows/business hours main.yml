@@ -55,6 +55,11 @@ jobs:
           echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
           echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
           echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
+          echo "ISSUE_NUMBER=${{ github.event.issue.number }}" >> "$GITHUB_ENV"
+
+      - name: Debug ISSUE_NUMBER in Workflow
+        run: |
+          echo "🔍 Debug: ISSUE_NUMBER received in workflow: '$ISSUE_NUMBER'"
 
       - name: Add Issue to Project (if not added)
         id: add_to_project
@@ -84,7 +89,7 @@ jobs:
           echo "Calculating business hours based on issue status changes..."
           python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PROJECT_ID" "$PRIORITY" "$GH_TOKEN"
 
-      - name: Debug Business Hours Output  # 🔍 Add this step immediately after calculation
+      - name: Debug Business Hours Output  # 🔍 Debugging step
         run: |
           echo "Checking business hours output..."
           cat business_hours_output.txt || echo "❌ No output found in business_hours_output.txt"
@@ -99,7 +104,6 @@ jobs:
 
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
           echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
-
 
       - name: Update Project Fields
         env:
