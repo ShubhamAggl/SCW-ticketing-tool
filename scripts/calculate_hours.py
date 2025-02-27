@@ -86,8 +86,8 @@ if __name__ == "__main__":
     
     sla_breached = "Breached" if total_business_seconds > sla_threshold else "Within SLA"
     
-    print(f"Total Hours (Seconds): {total_business_seconds}")  # Store total business hours in seconds
-    print(f"SLA Breached: {sla_breached}")
+    print(f"Total Hours (Seconds): {total_business_seconds}")  # Ensure correct formatting
+    print(f"SLA Breached: {sla_breached}")  # Ensure there is a space between "SLA" and value
     print("🔍 Debug: SLA calculation started...")
     print(f"Priority Received: {priority}")
     print(f"Total Business Seconds: {total_business_seconds}")
