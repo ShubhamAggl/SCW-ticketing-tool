@@ -4,17 +4,56 @@ import pytz
 import requests
 import json
 
-def get_issue_status_changes(issue_number, repo_owner, repo_name, token):
-    """Fetches the status change history of an issue from GitHub API."""
-    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues/{issue_number}/events"
-    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
+def get_issue_status_changes(issue_number, repo_owner, repo_name, project_id, token):
+    """Fetches the status change history of an issue from GitHub Projects API."""
     
-    response = requests.get(url, headers=headers)
+    url = "https://api.github.com/graphql"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    query = """
+    query($projectId: ID!, $issueNumber: Int!) {
+      repository(owner: "%s", name: "%s") {
+        issue(number: $issueNumber) {
+          projectItems(first: 10) {
+            nodes {
+              fieldValues(first: 10) {
+                nodes {
+                  ... on ProjectV2ItemFieldTextValue {
+                    text
+                  }
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                  }
+                  updatedAt
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """ % (repo_owner, repo_name)
+
+    payload = {
+        "query": query,
+        "variables": {
+            "projectId": project_id,
+            "issueNumber": int(issue_number)
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    
     if response.status_code != 200:
-        print(f"❌ Failed to fetch issue events. Status Code: {response.status_code}")
+        print(f"❌ Failed to fetch project issue events. Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
         return []
-    
+
     return response.json()
+
 
 def adjust_to_business_hours(dt):
     """Adjusts the timestamp to the nearest business hour boundary in IST."""
