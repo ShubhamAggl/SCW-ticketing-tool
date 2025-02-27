@@ -78,28 +78,43 @@ def calculate_sla_time(issue_events):
     sla_statuses = {"Triage", "In-Progress", "Resolved"}
     paused_statuses = {"Dependent on Customer"}
     ignored_statuses = {"Enhancement", "Cancelled"}
-    
+
     ist = pytz.timezone('Asia/Kolkata')
     total_seconds = 0
     active_start = None
-    
-    for event in issue_events:
-        if event.get("event") == "project_column" and "column_name" in event:
-            status = event["column_name"]
-            timestamp = datetime.fromisoformat(event["created_at"].replace('Z', '+00:00')).astimezone(ist)
-            
+
+    print("🔍 Debug: Tracking SLA Status Changes from Project Fields")
+
+    for event in issue_events.get("data", {}).get("repository", {}).get("issue", {}).get("projectItems", {}).get("nodes", []):
+        for field in event.get("fieldValues", {}).get("nodes", []):
+            if "text" in field:
+                status = field["text"]
+            elif "name" in field:
+                status = field["name"]
+            else:
+                continue
+
+            timestamp = datetime.fromisoformat(field["updatedAt"].replace('Z', '+00:00')).astimezone(ist)
+
+            print(f"🕒 Status Change: {status} at {timestamp}")
+
             if status in sla_statuses:
                 if active_start is None:
                     active_start = adjust_to_business_hours(timestamp)
+                    print(f"✅ SLA Started at {active_start}")
             elif status in paused_statuses and active_start:
                 total_seconds += (timestamp - active_start).total_seconds()
+                print(f"⏸️ SLA Paused, Time Counted: {total_seconds} seconds")
                 active_start = None
             elif status in ignored_statuses:
-                active_start = None  # Ignore all time spent after moving to these statuses
-    
+                print("❌ Ignored Status - Stopping SLA Calculation")
+                active_start = None
+
     if active_start:
         total_seconds += (datetime.now(ist) - active_start).total_seconds()
-    
+
+    print(f"⏳ Total SLA Business Seconds: {total_seconds}")
+
     return int(total_seconds)
 
 def get_sla_threshold(priority):
