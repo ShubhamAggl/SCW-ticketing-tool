@@ -83,10 +83,20 @@ jobs:
         run: |
           echo "Calculating business hours based on issue status changes..."
           python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PRIORITY" "$GH_TOKEN" > business_hours_output.txt
+
+      - name: Debug Business Hours Output  # 🔍 Add this step immediately after calculation
+        run: |
+          echo "Checking business hours output..."
+          cat business_hours_output.txt || echo "❌ No output found in business_hours_output.txt"
           
+      - name: Extract Business Hours Values
+        run: |
           TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours (Seconds):' | cut -d ':' -f2 | tr -d ' ')
           SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
-          
+
+          echo "Extracted TOTAL_HOURS: $TOTAL_HOURS"
+          echo "Extracted SLA_BREACHED: $SLA_BREACHED"
+
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
           echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
 
