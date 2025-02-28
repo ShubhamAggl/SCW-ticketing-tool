@@ -64,14 +64,24 @@ jobs:
         run: |
           echo "🔍 Debug: ISSUE_NUMBER in workflow: '${{ github.event.issue.number }}'"
 
-      - name: Calculate Business Hours
+      - name: Debug GH_TOKEN Before Running Python
+        run: |
+          echo "🔍 Debug: GitHub Token Length in Workflow: '${#GH_TOKEN}'"
+          if [ -z "$GH_TOKEN" ]; then
+            echo "❌ ERROR: GH_TOKEN is empty!"
+            exit 1
+          else
+            echo "✅ GH_TOKEN is set correctly."
+          fi
+      
+      - name: Run Business Hours Calculation
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          PROJECT_ID: "PVT_kwHOBffn_c4Ay8TW"  # Replace with your actual project ID
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Ensure token is explicitly passed
           ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         run: |
-          echo "Calculating business hours based on issue status changes..."
-          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PROJECT_ID" "$PRIORITY" "$GH_TOKEN"
+          echo "🔍 Debug: ISSUE_NUMBER before calling Python: '$ISSUE_NUMBER'"
+          echo "🔍 Debug: GitHub Token Length (Workflow): '${#GH_TOKEN}'"
+          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN"
 
       - name: Debug Business Hours Output  # 🔍 Debugging step
         run: |
