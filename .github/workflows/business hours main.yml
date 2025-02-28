@@ -59,6 +59,10 @@ jobs:
 
           echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
           echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+          
+      - name: Debug ISSUE_NUMBER
+        run: |
+          echo "🔍 Debug: ISSUE_NUMBER in workflow: '${{ github.event.issue.number }}'"
 
       - name: Calculate Business Hours
         env:
