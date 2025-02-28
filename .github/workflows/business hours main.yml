@@ -68,6 +68,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           PROJECT_ID: "PVT_kwHOBffn_c4Ay8TW"  # Replace with your actual project ID
+          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
         run: |
           echo "Calculating business hours based on issue status changes..."
           python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PROJECT_ID" "$PRIORITY" "$GH_TOKEN"
