@@ -100,6 +100,30 @@ def format_seconds_to_hms(seconds):
     secs = seconds % 60
     return f"{hours:02}:{minutes:02}:{secs:02}"
 
+def get_issue_id(repo_owner, repo_name, github_token):
+    """Fetches the issue ID from GitHub API when issue_number is missing."""
+    
+    url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/issues?state=all&per_page=1"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    response = requests.get(url, headers=headers)
+
+    if response.status_code != 200:
+        print(f"❌ ERROR: Failed to fetch issue ID. Status Code: {response.status_code}")
+        print(f"Response: {response.text}")
+        return None
+
+    issue_data = response.json()
+    
+    if not issue_data or "number" not in issue_data[0]:
+        print("❌ ERROR: No valid issue data found.")
+        return None
+    
+    return str(issue_data[0]["number"])  # Convert issue number to string
+
 # Main Execution
 if __name__ == "__main__":
     if len(sys.argv) < 5:
@@ -113,16 +137,22 @@ if __name__ == "__main__":
 
     print(f"🔍 Debug: ISSUE_NUMBER received in Python script: '{issue_number}'")
 
+    # 🔥 Fix: Fetch issue number if it's empty
+    if not issue_number or issue_number == "''":
+        print("⚠️ WARNING: issue_number is empty! Fetching from GitHub...")
+        issue_number = get_issue_id(repo_owner, repo_name, github_token)
+
     if not issue_number:
-        print("❌ ERROR: issue_number is empty in Python script. Exiting.")
+        print("❌ ERROR: Unable to retrieve a valid issue number. Exiting.")
         sys.exit(1)
+
+    print(f"✅ Using ISSUE_NUMBER: {issue_number}")
 
     issue_events = get_issue_status_changes(issue_number, repo_owner, repo_name, github_token)
     
     if not issue_events:
         print("❌ ERROR: No issue events found. Exiting.")
         sys.exit(1)
-
     total_business_seconds = calculate_sla_time(issue_events)
     formatted_time = format_seconds_to_hms(total_business_seconds)
 
