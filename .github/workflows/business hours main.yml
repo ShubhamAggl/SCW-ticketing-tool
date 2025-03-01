@@ -20,10 +20,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ISSUE_DATA=$(gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='query { repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") { issue(number: ${{ github.event.issue.number }}) { id createdAt closedAt labels(first: 10) { nodes { name } } } } }')
-          ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
-          if [ -z "$ISSUE_ID" ]; then exit 1; fi
-          echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
+          ISSUE_NUMBER=${{ github.event.issue.number }}  # Corrected: Use issue number instead of node ID
+          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> "$GITHUB_ENV"
+
 
       - name: Run Business Hours Calculation
         env:
