@@ -1,6 +1,7 @@
 import sys
 from datetime import datetime, timedelta
 import pytz
+import json
 
 def adjust_to_business_hours(dt):
     """Adjusts the timestamp to the nearest business hour boundary in IST."""
@@ -20,19 +21,20 @@ def adjust_to_business_hours(dt):
     
     return dt
 
-def calculate_business_hours(start_time, end_time):
-    """Calculates business hours between two datetime objects."""
+def calculate_business_hours(active_periods):
+    """Calculates business hours only within active SLA periods."""
     ist = pytz.timezone('Asia/Kolkata')
-    start_time = adjust_to_business_hours(start_time)
-    end_time = adjust_to_business_hours(end_time)
-    
     business_seconds = 0
-    current_time = start_time
     
-    while current_time < end_time:
-        if current_time.weekday() < 5 and 10 <= current_time.hour < 18:
-            business_seconds += 1
-        current_time += timedelta(seconds=1)
+    for period in active_periods:
+        start_time = adjust_to_business_hours(datetime.fromisoformat(period['start']).astimezone(pytz.utc))
+        end_time = adjust_to_business_hours(datetime.fromisoformat(period['end']).astimezone(pytz.utc))
+        
+        current_time = start_time
+        while current_time < end_time:
+            if current_time.weekday() < 5 and 10 <= current_time.hour < 18:
+                business_seconds += 1
+            current_time += timedelta(seconds=1)
     
     return business_seconds
 
@@ -47,11 +49,11 @@ def get_sla_threshold(priority):
     return sla_mapping.get(priority, 40 * 3600)
 
 if __name__ == "__main__":
-    start_time = datetime.fromisoformat(sys.argv[1].replace('Z', '+00:00')).astimezone(pytz.utc)
-    end_time = datetime.fromisoformat(sys.argv[2].replace('Z', '+00:00')).astimezone(pytz.utc)
-    priority = sys.argv[3].strip()
+    active_periods_json = sys.argv[1]
+    priority = sys.argv[2].strip()
     
-    total_business_seconds = calculate_business_hours(start_time, end_time)
+    active_periods = json.loads(active_periods_json)
+    total_business_seconds = calculate_business_hours(active_periods)
     sla_threshold = get_sla_threshold(priority)
     
     # Debugging Output
@@ -59,11 +61,8 @@ if __name__ == "__main__":
     print(f"Total Business Seconds: {total_business_seconds}")
     print(f"SLA Threshold (Seconds): {sla_threshold}")
     
-    # Fix: Ensure we're comparing in seconds
-    if total_business_seconds > sla_threshold:
-        sla_breached = "Breached"
-    else:
-        sla_breached = "WithinSLA"
+    # Ensure comparison in seconds
+    sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
     
     print(f"Total Hours: {total_business_seconds}")  # Store total business hours in seconds
     print(f"SLA Breached: {sla_breached}")
