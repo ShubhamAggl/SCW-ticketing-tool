@@ -105,7 +105,7 @@ if __name__ == "__main__":
         sla_threshold = get_sla_threshold(priority)
         sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
 
-        print(f"Total Hours: {total_business_seconds} seconds")
+        print(f"Total Hours: {total_business_seconds}")  # ✅ Output only the number
         print(f"SLA Breached: {sla_breached}")
 
     except Exception as e:
