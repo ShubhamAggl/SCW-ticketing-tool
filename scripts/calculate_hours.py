@@ -50,11 +50,10 @@ def get_issue_details(issue_id, github_token):
 
     return response_json.get("data", {}).get("node", {})
 
-def calculate_business_hours(start_time, end_time):
+def calculate_business_seconds(start_time, end_time):
     """
-    Calculate total business hours (9 AM - 6 PM IST) between start_time and end_time.
+    Calculate total business time in seconds (9 AM - 6 PM IST) between start_time and end_time.
     Excludes weekends.
-    Returns total time in seconds.
     """
     ist = pytz.timezone('Asia/Kolkata')
     start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00')).astimezone(ist)
@@ -101,11 +100,11 @@ if __name__ == "__main__":
     print(f"🔍 Debug: Received Inputs - Start Time: {start_time}, End Time: {end_time}, Priority: {priority}")
 
     try:
-        total_business_seconds = calculate_business_hours(start_time, end_time)
+        total_business_seconds = calculate_business_seconds(start_time, end_time)
         sla_threshold = get_sla_threshold(priority)
         sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
 
-        print(f"Total Hours: {total_business_seconds}")  # ✅ Output only the number
+        print(f"Total Business Hours (In Seconds): {total_business_seconds}")  # ✅ Output only the number in seconds
         print(f"SLA Breached: {sla_breached}")
 
     except Exception as e:
