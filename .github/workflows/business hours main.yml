@@ -28,7 +28,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python3 scripts/calculate_hours.py "$ISSUE_ID" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN" > business_hours_output.txt
+          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN" > business_hours_output.txt
+
 
       - name: Extract Business Hours Values
         run: |
