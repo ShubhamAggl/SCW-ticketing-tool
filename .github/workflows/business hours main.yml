@@ -18,135 +18,34 @@ jobs:
       - name: Get Issue ID and Metadata
         id: get_issue_details
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use GitHub's built-in token
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Fetching Issue ID and details using curl..."
-      
-          ISSUE_DATA=$(curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-            -X POST https://api.github.com/graphql -d '{
-              "query": "query { repository(owner: \"${{ github.repository_owner }}\", name: \"${{ github.event.repository.name }}\") { issue(number: ${{ github.event.issue.number }}) { id createdAt closedAt labels(first: 10) { nodes { name } } } } }"
-            }')
-      
-          echo "Raw Issue Data: $ISSUE_DATA"
-      
+          ISSUE_DATA=$(gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='query { repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") { issue(number: ${{ github.event.issue.number }}) { id createdAt closedAt labels(first: 10) { nodes { name } } } } }')
           ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
-      
-          if [ -z "$ISSUE_ID" ]; then
-            echo "❌ ERROR: ISSUE_ID is empty! Exiting."
-            exit 1
-          fi
-      
-          echo "Extracted Issue ID: $ISSUE_ID"
+          if [ -z "$ISSUE_ID" ]; then exit 1; fi
           echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
 
-
-      - name: Add Issue to Project (if not added)
-        id: add_to_project
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
-          
-          echo "Adding issue to project..."
-          PROJECT_ITEM_ID=$(gh api graphql -f query='
-          mutation {
-            addProjectV2ItemById(input: {projectId: "'$PROJECT_ID'", contentId: "'$ISSUE_ID'"}) {
-              item {
-                id
-              }
-            }
-          }' --jq '.data.addProjectV2ItemById.item.id')
-
-          echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
-          echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
-          
-      - name: Debug ISSUE_NUMBER
-        run: |
-          echo "🔍 Debug: ISSUE_NUMBER in workflow: '${{ github.event.issue.number }}'"
-
-      - name: Debug GH_TOKEN Before Running Python
-        run: |
-          echo "🔍 Debug: GitHub Token Length in Workflow: '${#GH_TOKEN}'"
-          if [ -z "$GH_TOKEN" ]; then
-            echo "❌ ERROR: GH_TOKEN is empty!"
-            exit 1
-          else
-            echo "✅ GH_TOKEN is set correctly."
-          fi
-      
       - name: Run Business Hours Calculation
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}  # ✅ Ensure token is explicitly passed
-          ISSUE_NUMBER: ${{ env.ISSUE_NUMBER }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Debug: ISSUE_NUMBER before calling Python: '$ISSUE_NUMBER'"
-          echo "🔍 Debug: GitHub Token Length (Workflow): '${#GH_TOKEN}'"
-          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN"
+          python3 scripts/calculate_hours.py "$ISSUE_ID" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN" > business_hours_output.txt
 
-      - name: Debug Business Hours Output  # 🔍 Debugging step
-        run: |
-          echo "Checking business hours output..."
-          cat business_hours_output.txt || echo "❌ No output found in business_hours_output.txt"
-          
       - name: Extract Business Hours Values
         run: |
-          TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours (Seconds):' | cut -d ':' -f2 | tr -d ' ')
-          SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2- | sed 's/^ //')
-
-          echo "Extracted TOTAL_HOURS: $TOTAL_HOURS"
-          echo "Extracted SLA_BREACHED: $SLA_BREACHED"
-
+          TOTAL_HOURS=$(grep 'Total Business Hours:' business_hours_output.txt | cut -d ':' -f2 | tr -d ' ')
+          SLA_BREACHED=$(grep 'SLA Breached:' business_hours_output.txt | cut -d ':' -f2- | sed 's/^ //')
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
           echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
 
       - name: Update Project Fields
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
           TOTAL_HOURS_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RLc"
           SLA_BREACHED_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RYQ"
-          
-          echo "Fetching Project Item ID..."
-          PROJECT_ITEM_ID=$(gh api graphql -f query='{
-            node(id: "'$PROJECT_ID'") {
-              ... on ProjectV2 {
-                items(first: 100) {
-                  nodes {
-                    id
-                    content { ... on Issue { id } }
-                  }
-                }
-              }
-            }
-          }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
-          
-          if [ -z "$PROJECT_ITEM_ID" ]; then
-            echo "Issue not found in project. Exiting."
-            exit 1
-          fi
-          
-          echo "Updating project fields..."
-          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
-            updateProjectV2ItemFieldValue(input: {
-              projectId: $projectId
-              itemId: $itemId
-              fieldId: $fieldId
-              value: { number: $value }
-            }) {
-              projectV2Item { id }
-            }
-          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$TOTAL_HOURS_FIELD_ID" -F value="$TOTAL_HOURS"
-          
-          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
-            updateProjectV2ItemFieldValue(input: {
-              projectId: $projectId
-              itemId: $itemId
-              fieldId: $fieldId
-              value: { text: $value }
-            }) {
-              projectV2Item { id }
-            }
-          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$SLA_BREACHED_FIELD_ID" -F value="$SLA_BREACHED"
-
-          echo "✅ Project fields updated successfully!"
+          PROJECT_ITEM_ID=$(gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='{ node(id: "'$PROJECT_ID'") { ... on ProjectV2 { items(first: 100) { nodes { id content { ... on Issue { id } } } } } } }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
+          if [ -z "$PROJECT_ITEM_ID" ]; then exit 1; fi
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) { updateProjectV2ItemFieldValue(input: { projectId: $projectId itemId: $itemId fieldId: $fieldId value: { number: $value } }) { projectV2Item { id } } }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$TOTAL_HOURS_FIELD_ID" -F value="$TOTAL_HOURS"
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) { updateProjectV2ItemFieldValue(input: { projectId: $projectId itemId: $itemId fieldId: $fieldId value: { text: $value } }) { projectV2Item { id } } }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$SLA_BREACHED_FIELD_ID" -F value="$SLA_BREACHED"
