@@ -92,20 +92,22 @@ def get_sla_threshold(priority):
     return sla_mapping.get(priority, 200)
 
 if __name__ == "__main__":
-    if len(sys.argv) < 5:
-        print("❌ ERROR: Missing arguments. Usage: calculate_hours.py <issue_id> <start_time> <end_time> <priority> <github_token>")
+    if len(sys.argv) < 4:
+        print("❌ ERROR: Missing arguments. Usage: calculate_hours.py <start_time> <end_time> <priority>")
         sys.exit(1)
-    
-    issue_id, start_time, end_time, priority, github_token = sys.argv[1:6]
-    issue_data = get_issue_details(issue_id, github_token)
-    
-    if not issue_data or not start_time or not end_time:
-        print("❌ ERROR: Missing issue timestamps. Exiting.")
+
+    start_time, end_time, priority = sys.argv[1:4]
+
+    print(f"🔍 Debug: Received Inputs - Start Time: {start_time}, End Time: {end_time}, Priority: {priority}")
+
+    try:
+        total_business_seconds = calculate_business_hours(start_time, end_time)
+        sla_threshold = get_sla_threshold(priority)
+        sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
+
+        print(f"Total Hours: {total_business_seconds} seconds")
+        print(f"SLA Breached: {sla_breached}")
+
+    except Exception as e:
+        print(f"❌ ERROR: Exception occurred in the script: {e}")
         sys.exit(1)
-    
-    total_business_seconds = calculate_business_hours(start_time, end_time)
-    sla_threshold = get_sla_threshold(priority)
-    sla_breached = "Breached" if total_business_seconds > sla_threshold else "WithinSLA"
-    
-    print(f"Total Business Hours (Seconds): {total_business_seconds}")
-    print(f"SLA Breached: {sla_breached}")
