@@ -18,34 +18,116 @@ jobs:
       - name: Get Issue ID and Metadata
         id: get_issue_details
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          ISSUE_NUMBER=${{ github.event.issue.number }}  # Corrected: Use issue number instead of node ID
-          echo "ISSUE_NUMBER=$ISSUE_NUMBER" >> "$GITHUB_ENV"
-
-
-      - name: Run Business Hours Calculation
+          echo "Fetching Issue ID and details..."
+          
+          ISSUE_DATA=$(gh api graphql -f query='{
+            repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
+              issue(number: ${{ github.event.issue.number }}) {
+                id
+                createdAt
+                closedAt
+                labels(first: 10) {
+                  nodes {
+                    name
+                  }
+                }
+              }
+            }
+          }')
+          echo "Raw Issue Data: $ISSUE_DATA"
+          ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
+          if [ -z "$ISSUE_ID" ]; then
+            echo "❌ ERROR: ISSUE_ID is empty! Exiting."
+            exit 1
+          fi
+          START_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.createdAt')
+          END_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.closedAt')
+          PRIORITY=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.labels.nodes[].name' | grep -E '^P[1-4]$' || echo "P4")
+          echo "Extracted Issue ID: $ISSUE_ID"
+          echo "START_TIME=$START_TIME" >> "$GITHUB_ENV"
+          echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
+          echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
+          echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
+      - name: Add Issue to Project (if not added)
+        id: add_to_project
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$GH_TOKEN" > business_hours_output.txt
-
-
-      - name: Extract Business Hours Values
+          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          
+          echo "Adding issue to project..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='
+          mutation {
+            addProjectV2ItemById(input: {projectId: "'$PROJECT_ID'", contentId: "'$ISSUE_ID'"}) {
+              item {
+                id
+              }
+            }
+          }' --jq '.data.addProjectV2ItemById.item.id')
+          echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
+          echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+      - name: Calculate Business Hours
+        id: calculate_hours
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          TOTAL_HOURS=$(grep 'Total Business Hours:' business_hours_output.txt | cut -d ':' -f2 | tr -d ' ')
-          SLA_BREACHED=$(grep 'SLA Breached:' business_hours_output.txt | cut -d ':' -f2- | sed 's/^ //')
+          echo "Calculating business hours based on issue status changes..."
+          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PRIORITY" "$GH_TOKEN" > business_hours_output.txt
+          
+          TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours (Seconds):' | cut -d ':' -f2 | tr -d ' ')
+          SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
+          
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
           echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
-
       - name: Update Project Fields
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
           TOTAL_HOURS_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RLc"
           SLA_BREACHED_FIELD_ID="PVTF_lAHOBffn_c4Ay8TWzgo5RYQ"
-          PROJECT_ITEM_ID=$(gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='{ node(id: "'$PROJECT_ID'") { ... on ProjectV2 { items(first: 100) { nodes { id content { ... on Issue { id } } } } } } }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
-          if [ -z "$PROJECT_ITEM_ID" ]; then exit 1; fi
-          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) { updateProjectV2ItemFieldValue(input: { projectId: $projectId itemId: $itemId fieldId: $fieldId value: { number: $value } }) { projectV2Item { id } } }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$TOTAL_HOURS_FIELD_ID" -F value="$TOTAL_HOURS"
-          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) { updateProjectV2ItemFieldValue(input: { projectId: $projectId itemId: $itemId fieldId: $fieldId value: { text: $value } }) { projectV2Item { id } } }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$SLA_BREACHED_FIELD_ID" -F value="$SLA_BREACHED"
+          
+          echo "Fetching Project Item ID..."
+          PROJECT_ITEM_ID=$(gh api graphql -f query='{
+            node(id: "'$PROJECT_ID'") {
+              ... on ProjectV2 {
+                items(first: 100) {
+                  nodes {
+                    id
+                    content { ... on Issue { id } }
+                  }
+                }
+              }
+            }
+          }' --jq '.data.node.items.nodes[] | select(.content.id=="'$ISSUE_ID'") | .id')
+          
+          if [ -z "$PROJECT_ITEM_ID" ]; then
+            echo "Issue not found in project. Exiting."
+            exit 1
+          fi
+          
+          echo "Updating project fields..."
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { number: $value }
+            }) {
+              projectV2Item { id }
+            }
+          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$TOTAL_HOURS_FIELD_ID" -F value="$TOTAL_HOURS"
+          
+          gh api graphql -H "Authorization: Bearer $GH_TOKEN" -f query='mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
+            updateProjectV2ItemFieldValue(input: {
+              projectId: $projectId
+              itemId: $itemId
+              fieldId: $fieldId
+              value: { text: $value }
+            }) {
+              projectV2Item { id }
+            }
+          }' -F projectId="$PROJECT_ID" -F itemId="$PROJECT_ITEM_ID" -F fieldId="$SLA_BREACHED_FIELD_ID" -F value="$SLA_BREACHED"
+          echo "✅ Project fields updated successfully!"
