@@ -15,13 +15,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get Issue ID and Metadata
+      - name: Get Issue ID and Status History
         id: get_issue_details
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          echo "Fetching Issue ID and details..."
-          
+          echo "Fetching Issue ID and status history..."
           ISSUE_DATA=$(gh api graphql -f query='{
             repository(owner: "${{ github.repository_owner }}", name: "${{ github.event.repository.name }}") {
               issue(number: ${{ github.event.issue.number }}) {
@@ -29,56 +28,68 @@ jobs:
                 createdAt
                 closedAt
                 labels(first: 10) {
+                  nodes { name }
+                }
+                timelineItems(first: 100, itemTypes: PROJECT_V2_ITEM_STATUS_CHANGED_EVENT) {
                   nodes {
-                    name
+                    ... on ProjectV2ItemStatusChangedEvent {
+                      createdAt
+                      newValue
+                    }
                   }
                 }
               }
             }
           }')
           echo "Raw Issue Data: $ISSUE_DATA"
+          
           ISSUE_ID=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.id')
-          if [ -z "$ISSUE_ID" ]; then
-            echo "❌ ERROR: ISSUE_ID is empty! Exiting."
-            exit 1
-          fi
-          START_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.createdAt')
-          END_TIME=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.closedAt')
+          STATUS_EVENTS=$(echo "$ISSUE_DATA" | jq -c '.data.repository.issue.timelineItems.nodes')
           PRIORITY=$(echo "$ISSUE_DATA" | jq -r '.data.repository.issue.labels.nodes[].name' | grep -E '^P[1-4]$' || echo "P4")
+          
           echo "Extracted Issue ID: $ISSUE_ID"
-          echo "START_TIME=$START_TIME" >> "$GITHUB_ENV"
-          echo "END_TIME=$END_TIME" >> "$GITHUB_ENV"
+          echo "STATUS_EVENTS=$STATUS_EVENTS" >> "$GITHUB_ENV"
           echo "PRIORITY=$PRIORITY" >> "$GITHUB_ENV"
           echo "ISSUE_ID=$ISSUE_ID" >> "$GITHUB_ENV"
-      - name: Add Issue to Project (if not added)
-        id: add_to_project
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Process Status Changes for SLA Calculation
+        id: process_status
         run: |
-          PROJECT_ID="PVT_kwHOBffn_c4Ay8TW"
+          echo "Processing status history..."
+          ACTIVE_PERIODS=()
+          LAST_ACTIVE_TIME=""
+          for event in $(echo "$STATUS_EVENTS" | jq -c '.[]'); do
+            STATUS=$(echo "$event" | jq -r '.newValue')
+            TIME=$(echo "$event" | jq -r '.createdAt')
+            if [[ "$STATUS" == "Triage" || "$STATUS" == "In-Progress" ]]; then
+              LAST_ACTIVE_TIME="$TIME"
+            elif [[ "$STATUS" == "Dependent on Customer" && "$LAST_ACTIVE_TIME" != "" ]]; then
+              ACTIVE_PERIODS+=("{\"start\": \"$LAST_ACTIVE_TIME\", \"end\": \"$TIME\"}")
+              LAST_ACTIVE_TIME=""
+            elif [[ "$STATUS" == "Resolved" || "$STATUS" == "Closed" ]]; then
+              if [[ "$LAST_ACTIVE_TIME" != "" ]]; then
+                ACTIVE_PERIODS+=("{\"start\": \"$LAST_ACTIVE_TIME\", \"end\": \"$TIME\"}")
+              fi
+              break
+            fi
+          done
           
-          echo "Adding issue to project..."
-          PROJECT_ITEM_ID=$(gh api graphql -f query='
-          mutation {
-            addProjectV2ItemById(input: {projectId: "'$PROJECT_ID'", contentId: "'$ISSUE_ID'"}) {
-              item {
-                id
-              }
-            }
-          }' --jq '.data.addProjectV2ItemById.item.id')
-          echo "Issue added to project with ProjectV2Item ID: $PROJECT_ITEM_ID"
-          echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
+          ACTIVE_PERIODS_JSON="[${ACTIVE_PERIODS[*]}]"
+          echo "ACTIVE_PERIODS=$ACTIVE_PERIODS_JSON" >> "$GITHUB_ENV"
+          echo "Processed Active Periods: $ACTIVE_PERIODS_JSON"
+
       - name: Calculate Business Hours
         id: calculate_hours
         run: |
           echo "Calculating business hours..."
-          python3 scripts/calculate_hours.py "$START_TIME" "$END_TIME" "$PRIORITY" > business_hours_output.txt
+          python3 scripts/calculate_hours.py "$ACTIVE_PERIODS" "$PRIORITY" > business_hours_output.txt
           
           TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours:' | cut -d ':' -f2 | tr -d ' ')
           SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
           
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
           echo "SLA_BREACHED=$SLA_BREACHED" >> "$GITHUB_ENV"
+      
       - name: Update Project Fields
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
