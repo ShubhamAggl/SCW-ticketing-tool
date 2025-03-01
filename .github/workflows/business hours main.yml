@@ -70,13 +70,11 @@ jobs:
           echo "PROJECT_ITEM_ID=$PROJECT_ITEM_ID" >> "$GITHUB_ENV"
       - name: Calculate Business Hours
         id: calculate_hours
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          echo "Calculating business hours based on issue status changes..."
-          python3 scripts/calculate_hours.py "$ISSUE_NUMBER" "$GITHUB_REPOSITORY_OWNER" "$GITHUB_REPOSITORY_NAME" "$PRIORITY" "$GH_TOKEN" > business_hours_output.txt
+          echo "Calculating business hours..."
+          python3 scripts/calculate_hours.py "$START_TIME" "$END_TIME" "$PRIORITY" > business_hours_output.txt
           
-          TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours (Seconds):' | cut -d ':' -f2 | tr -d ' ')
+          TOTAL_HOURS=$(cat business_hours_output.txt | grep 'Total Hours:' | cut -d ':' -f2 | tr -d ' ')
           SLA_BREACHED=$(cat business_hours_output.txt | grep 'SLA Breached:' | cut -d ':' -f2 | tr -d ' ')
           
           echo "TOTAL_HOURS=$TOTAL_HOURS" >> "$GITHUB_ENV"
